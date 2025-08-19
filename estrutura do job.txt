@@ -1,0 +1,44 @@
+exames-app/
+│── App.js                 # Arquivo principal do app
+│── package.json
+│── app.json
+│── babel.config.js
+│
+├── assets/                # Imagens, ícones, fontes, sons
+│   ├── images/
+│   ├── icons/
+│   └── fonts/
+│
+├── src/                   # Código fonte do app
+│   ├── screens/           # Todas as telas do app
+│   │   ├── LoginScreen.js
+│   │   ├── ExamsScreen.js
+│   │   ├── QuestionScreen.js
+│   │   ├── ChatScreen.js
+│   │   └── ResultsScreen.js
+│   │
+│   ├── components/        # Componentes reutilizáveis (botões, cards, inputs, etc.)
+│   │   ├── CustomButton.js
+│   │   ├── QuestionCard.js
+│   │   └── Header.js
+│   │
+│   ├── navigation/        # Navegação entre telas
+│   │   └── AppNavigator.js
+│   │
+│   ├── services/          # Conexão com APIs externas (ex: IA, banco de dados, etc.)
+│   │   ├── aiService.js   # Integração com IA (explicador)
+│   │   └── api.js         # Funções para buscar exames do servidor (se tiver backend)
+│   │
+│   ├── data/              # Dados estáticos ou mockados (exames antigos, questões)
+│   │   └── examsData.js
+│   │
+│   ├── context/           # Contexto global (ex: autenticação, progresso do aluno)
+│   │   └── AuthContext.js
+│   │
+│   ├── utils/             # Funções auxiliares (formatar data, randomizar perguntas, etc.)
+│   │   └── helpers.js
+│   │
+│   └── styles/            # Estilos globais
+│       └── colors.js
+│
+└── .gitignore             # Arquivos ignorados pelo Git
