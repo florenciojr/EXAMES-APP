@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { askAI } from '../utils/askAI';
 
 export default function QuestionScreen({ route, navigation }) {
   const { exam } = route.params || {};
@@ -18,6 +19,8 @@ export default function QuestionScreen({ route, navigation }) {
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState(Array(questions.length).fill(null));
   const [showResult, setShowResult] = useState(false);
+  const [aiExplanation, setAIExplanation] = useState('');
+  const [loadingAI, setLoadingAI] = useState(false);
 
   function handleSelect(idx) {
     const newAnswers = [...answers];
@@ -47,6 +50,13 @@ export default function QuestionScreen({ route, navigation }) {
     return score;
   }
 
+  async function handleAskAI() {
+    setLoadingAI(true);
+    const response = await askAI(questions[current].text, questions[current].options);
+    setAIExplanation(response);
+    setLoadingAI(false);
+  }
+
   if (showResult) {
     return (
       <View style={styles.container}>
@@ -72,9 +82,16 @@ export default function QuestionScreen({ route, navigation }) {
           <Text>{option}</Text>
         </TouchableOpacity>
       ))}
-      <TouchableOpacity style={styles.explanation} onPress={() => alert(questions[current].explanation)}>
-        <Text style={{ color: '#007AFF' }}>Ver Explicação</Text>
+      <TouchableOpacity style={styles.explanation} onPress={handleAskAI}>
+        <Text style={{ color: '#007AFF' }}>
+          {loadingAI ? 'Carregando explicação...' : 'Debruce/Explica'}
+        </Text>
       </TouchableOpacity>
+      {aiExplanation ? (
+        <View style={{ marginTop: 10, backgroundColor: '#e0f7fa', padding: 10, borderRadius: 8 }}>
+          <Text>{aiExplanation}</Text>
+        </View>
+      ) : null}
 
       <View style={styles.slideNav}>
         <TouchableOpacity

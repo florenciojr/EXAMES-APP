@@ -6,7 +6,7 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>📘 App de Exames</Text>
+      <Text style={styles.title}>Ola ^_~ esse sera App de Exames</Text>
       <TextInput
         style={styles.input}
         placeholder="Digite seu nome"
