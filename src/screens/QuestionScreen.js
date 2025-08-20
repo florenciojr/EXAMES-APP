@@ -1,6 +1,14 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { askAI } from '../utils/askAI';
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  TextInput
+} from "react-native";
+import { askAI } from "../utils/askAI";
 
 export default function QuestionScreen({ route, navigation }) {
   const { exam } = route.params || {};
@@ -8,7 +16,10 @@ export default function QuestionScreen({ route, navigation }) {
     return (
       <View style={styles.container}>
         <Text style={styles.title}>Erro: Exame não encontrado</Text>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
           <Text style={styles.backButtonText}>Voltar</Text>
         </TouchableOpacity>
       </View>
@@ -19,8 +30,11 @@ export default function QuestionScreen({ route, navigation }) {
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState(Array(questions.length).fill(null));
   const [showResult, setShowResult] = useState(false);
-  const [aiExplanation, setAIExplanation] = useState('');
+
+  // chat IA
+  const [chatHistory, setChatHistory] = useState([]);
   const [loadingAI, setLoadingAI] = useState(false);
+  const [userInput, setUserInput] = useState("");
 
   function handleSelect(idx) {
     const newAnswers = [...answers];
@@ -31,6 +45,7 @@ export default function QuestionScreen({ route, navigation }) {
   function handleNext() {
     if (current < questions.length - 1) {
       setCurrent(current + 1);
+      setChatHistory([]); // limpa chat para próxima questão
     } else {
       setShowResult(true);
     }
@@ -50,19 +65,44 @@ export default function QuestionScreen({ route, navigation }) {
     return score;
   }
 
-  async function handleAskAI() {
+  async function handleSendMessage() {
+    if (!userInput.trim()) return;
+
+    // adiciona mensagem do aluno
+    const newHistory = [
+      ...chatHistory,
+      { role: "user", parts: [{ text: userInput }] }
+    ];
+    setChatHistory(newHistory);
+    setUserInput("");
     setLoadingAI(true);
-    const response = await askAI(questions[current].text, questions[current].options);
-    setAIExplanation(response);
+
+    // envia tudo para IA (pergunta + histórico)
+    const response = await askAI(
+      questions[current].text,
+      questions[current].options,
+      newHistory
+    );
+
+    const updatedHistory = [
+      ...newHistory,
+      { role: "model", parts: [{ text: response }] }
+    ];
+    setChatHistory(updatedHistory);
     setLoadingAI(false);
   }
 
   if (showResult) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>Cotação Final</Text>
-        <Text style={styles.question}>Você acertou {getScore()} de {questions.length} questões!</Text>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <Text style={styles.title}>Resultado Final 🎉</Text>
+        <Text style={styles.resultText}>
+          Você acertou {getScore()} de {questions.length} questões!
+        </Text>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
           <Text style={styles.backButtonText}>Voltar</Text>
         </TouchableOpacity>
       </View>
@@ -71,28 +111,78 @@ export default function QuestionScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{exam.title}</Text>
-      <Text style={styles.question}>Pergunta {current + 1}: {questions[current].text}</Text>
-      {questions[current].options.map((option, idx) => (
-        <TouchableOpacity
-          key={idx}
-          style={[styles.option, answers[current] === idx && { backgroundColor: '#b3e5fc' }]}
-          onPress={() => handleSelect(idx)}
-        >
-          <Text>{option}</Text>
-        </TouchableOpacity>
-      ))}
-      <TouchableOpacity style={styles.explanation} onPress={handleAskAI}>
-        <Text style={{ color: '#007AFF' }}>
-          {loadingAI ? 'Carregando explicação...' : 'Debruce/Explica'}
-        </Text>
-      </TouchableOpacity>
-      {aiExplanation ? (
-        <View style={{ marginTop: 10, backgroundColor: '#e0f7fa', padding: 10, borderRadius: 8 }}>
-          <Text>{aiExplanation}</Text>
-        </View>
-      ) : null}
+      {/* Barra de Progresso */}
+      <View style={styles.progressBar}>
+        <View
+          style={[
+            styles.progressFill,
+            { width: `${((current + 1) / questions.length) * 100}%` }
+          ]}
+        />
+      </View>
 
+      <Text style={styles.title}>{exam.title}</Text>
+      <Text style={styles.question}>
+        Pergunta {current + 1}: {questions[current].text}
+      </Text>
+
+      {/* Opções */}
+      <View style={styles.optionsContainer}>
+        {questions[current].options.map((option, idx) => (
+          <TouchableOpacity
+            key={idx}
+            style={[
+              styles.optionCard,
+              answers[current] === idx && styles.optionSelected
+            ]}
+            onPress={() => handleSelect(idx)}
+          >
+            <Text style={styles.optionText}>{option}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Chat IA */}
+      <View style={styles.chatBox}>
+        <Text style={styles.chatTitle}>Explicador Virtual 🤖</Text>
+        <ScrollView style={styles.chatHistory}>
+          {chatHistory.map((msg, idx) => (
+            <View
+              key={idx}
+              style={[
+                styles.chatBubble,
+                msg.role === "user"
+                  ? styles.chatBubbleUser
+                  : styles.chatBubbleAI
+              ]}
+            >
+              <Text
+                style={{
+                  color: msg.role === "user" ? "#fff" : "#000"
+                }}
+              >
+                {msg.parts[0].text}
+              </Text>
+            </View>
+          ))}
+          {loadingAI && <ActivityIndicator size="small" color="#007AFF" />}
+        </ScrollView>
+
+        {/* Input do aluno */}
+        <View style={styles.inputRow}>
+          <TextInput
+            style={styles.input}
+            placeholder="Digite sua resposta..."
+            value={userInput}
+            onChangeText={setUserInput}
+          />
+          <TouchableOpacity style={styles.sendButton} onPress={handleSendMessage}>
+            <Text style={styles.sendButtonText}>Enviar</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Navegação */}
       <View style={styles.slideNav}>
         <TouchableOpacity
           style={[styles.slideButton, current === 0 && { opacity: 0.5 }]}
@@ -104,50 +194,108 @@ export default function QuestionScreen({ route, navigation }) {
         <TouchableOpacity
           style={[
             styles.slideButton,
-            answers[current] === null && { backgroundColor: '#f44336' }
+            answers[current] === null && { backgroundColor: "#ccc" }
           ]}
           onPress={handleNext}
           disabled={answers[current] === null}
         >
-          <Text style={styles.slideButtonText}>Seguinte</Text>
+          <Text style={styles.slideButtonText}>
+            {current === questions.length - 1 ? "Finalizar" : "Seguinte"}
+          </Text>
         </TouchableOpacity>
       </View>
-
-      <View style={styles.questionIndicator}>
-        {questions.map((_, idx) => (
-          <View
-            key={idx}
-            style={[
-              styles.indicatorDot,
-              idx === current && styles.indicatorDotActive,
-              answers[idx] === null && styles.indicatorDotBlank
-            ]}
-          />
-        ))}
-        <Text style={styles.indicatorText}>Pergunta {current + 1} de {questions.length}</Text>
-      </View>
-
-      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-        <Text style={styles.backButtonText}>Voltar</Text>
-      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20 },
-  question: { fontSize: 18, marginBottom: 15 },
-  option: { backgroundColor: '#e0e0e0', padding: 12, borderRadius: 8, marginVertical: 5, width: '80%', alignItems: 'center' },
-  explanation: { marginTop: 20 },
-  slideNav: { flexDirection: 'row', justifyContent: 'space-between', width: '80%', marginTop: 20 },
-  slideButton: { backgroundColor: '#007AFF', padding: 12, borderRadius: 8, alignItems: 'center', width: '45%' },
-  slideButtonText: { color: '#fff', fontSize: 16 },
-  questionIndicator: { flexDirection: 'row', alignItems: 'center', marginTop: 20 },
-  indicatorDot: { width: 16, height: 16, borderRadius: 8, backgroundColor: '#ccc', marginHorizontal: 4 },
-  indicatorDotActive: { backgroundColor: '#007AFF' },
-  indicatorDotBlank: { backgroundColor: '#f44336' },
-  indicatorText: { marginLeft: 12, fontSize: 16 },
-  backButton: { marginTop: 20, backgroundColor: '#ccc', padding: 10, borderRadius: 8, alignItems: 'center', width: '80%' },
-  backButtonText: { color: '#333', fontSize: 16 },
+  container: { flex: 1, backgroundColor: "#f9f9f9", padding: 20 },
+  title: { fontSize: 22, fontWeight: "bold", marginVertical: 10, textAlign: "center" },
+  question: { fontSize: 18, marginBottom: 15, textAlign: "center" },
+
+  progressBar: {
+    height: 8,
+    backgroundColor: "#e0e0e0",
+    borderRadius: 4,
+    overflow: "hidden",
+    marginBottom: 15
+  },
+  progressFill: {
+    height: 8,
+    backgroundColor: "#007AFF"
+  },
+
+  optionsContainer: { marginBottom: 20 },
+  optionCard: {
+    backgroundColor: "#fff",
+    padding: 15,
+    borderRadius: 12,
+    marginVertical: 6,
+    elevation: 2
+  },
+  optionSelected: { backgroundColor: "#b3e5fc" },
+  optionText: { fontSize: 16 },
+
+  chatBox: {
+    flex: 1,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 15,
+    elevation: 2
+  },
+  chatTitle: { fontWeight: "bold", fontSize: 16, marginBottom: 6 },
+  chatHistory: { maxHeight: 150, marginBottom: 10 },
+  chatBubble: {
+    padding: 10,
+    borderRadius: 10,
+    marginVertical: 4,
+    maxWidth: "80%"
+  },
+  chatBubbleUser: { backgroundColor: "#007AFF", alignSelf: "flex-end" },
+  chatBubbleAI: { backgroundColor: "#e0e0e0", alignSelf: "flex-start" },
+
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center"
+  },
+  input: {
+    flex: 1,
+    borderColor: "#ccc",
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 8,
+    marginRight: 8
+  },
+  sendButton: {
+    backgroundColor: "#007AFF",
+    padding: 10,
+    borderRadius: 8
+  },
+  sendButtonText: { color: "#fff", fontWeight: "bold" },
+
+  slideNav: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 10
+  },
+  slideButton: {
+    backgroundColor: "#007AFF",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    width: "45%"
+  },
+  slideButtonText: { color: "#fff", fontSize: 16 },
+
+  resultText: { fontSize: 18, marginVertical: 20, textAlign: "center" },
+
+  backButton: {
+    marginTop: 20,
+    backgroundColor: "#ccc",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center"
+  },
+  backButtonText: { color: "#333", fontSize: 16 }
 });

@@ -1,12 +1,17 @@
 // utils/askAI.js
-export async function askAI(questionText, options) {
-  // usa o link do ngrok no lugar do IP local
-  const BACKEND_URL = "https://7dbd31371ac8.ngrok-free.app/askAI";
+export async function askAI(questionText, options, history = []) {
+  const BACKEND_URL = "https://7dbd31371ac8.ngrok-free.app/askAI"; // atualiza sempre o ngrok
 
   if (!questionText || !options || !options.length) {
     console.error("⚠️ questionText ou options inválidos");
     return "Erro: parâmetros inválidos";
   }
+
+  // garante que o histórico seja enviado no formato certo
+  const formattedHistory = history.map(msg => ({
+    role: msg.role || "user",
+    parts: (msg.parts || []).map(p => ({ text: p.text }))
+  }));
 
   try {
     const response = await fetch(BACKEND_URL, {
@@ -16,7 +21,8 @@ export async function askAI(questionText, options) {
       },
       body: JSON.stringify({
         question: questionText,
-        options: options
+        options: options,
+        history: formattedHistory
       })
     });
 

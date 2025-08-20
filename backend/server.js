@@ -11,22 +11,24 @@ const API_KEY = "AIzaSyA2m380MuY_J-8Reb-VvZ1B9IPX0xc6AbU"; // ⚠️ substitui p
 const ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
 app.post("/askAI", async (req, res) => {
-  const { question, options } = req.body;
+  const { question, options, history = [] } = req.body;
 
   try {
-    const response = await fetch(ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": API_KEY
-      },
- body: JSON.stringify({
-  contents: [
-    {
-      parts: [
+    // força o history a ficar no formato certo
+    const formattedHistory = history.map(msg => ({
+      role: msg.role || "user",
+      parts: (msg.parts || []).map(p => ({ text: p.text }))
+    }));
+
+    const payload = {
+      contents: [
+        ...formattedHistory,
         {
-          text: `Você é um explicador virtual que ajuda alunos de Moçambique a estudar para exames de admissão. 
-          
+          role: "user",
+          parts: [
+            {
+              text: `Você é um explicador virtual que ajuda alunos de Moçambique a estudar para exames de admissão. 
+
 Seu papel não é só dar a resposta, mas sim:
 - Dar pistas e dicas.
 - Fazer perguntas guiadas ao aluno.
@@ -35,19 +37,25 @@ Seu papel não é só dar a resposta, mas sim:
 
 Questão: ${question}
 Alternativas: ${options.join(", ")}`
+            }
+          ]
         }
       ]
-    }
-  ]
-})
+    };
 
+    const response = await fetch(ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": API_KEY
+      },
+      body: JSON.stringify(payload)
     });
 
     const data = await response.json();
-    console.log("Resposta da API Gemini:", JSON.stringify(data, null, 2));
+    console.log("Resposta da IA:", JSON.stringify(data, null, 2));
 
-    // tenta extrair o texto da forma mais segura possível
-    let resultText =
+    const resultText =
       data?.candidates?.[0]?.content?.parts?.[0]?.text ||
       data?.candidates?.[0]?.output ||
       data?.error?.message ||
