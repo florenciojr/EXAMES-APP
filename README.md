@@ -40,18 +40,38 @@ O backend é um servidor Node.js que está na pasta `backend/`. As dependências
 
 ### 4. Configurar a Conexão Frontend-Backend
 
-Para que o aplicativo (frontend) possa se comunicar com o seu servidor local (backend), você precisa ajustar a URL da API no código.
+Para que o aplicativo (frontend) possa se comunicar com o seu servidor local (backend), você precisa de um endereço que seja acessível a partir do seu emulador ou dispositivo físico.
 
-Abra o arquivo `src/utils/askAI.js` e altere a variável `BACKEND_URL` para apontar para o seu endereço local na porta 3000. Substitua o URL do `ngrok` pelo seguinte:
+#### Opção 1: Usando o Endereço IP Local (Para a mesma rede Wi-Fi)
+
+Se o seu computador e o seu dispositivo móvel estiverem na mesma rede Wi-Fi, você pode usar o endereço IP local do seu computador.
+
+1.  Descubra o endereço IP da sua máquina na rede local (ex: `192.168.1.10`).
+2.  Abra o arquivo `src/utils/askAI.js` e altere a variável `BACKEND_URL` para este endereço:
 
 ```javascript
-// Antes
-const BACKEND_URL = "https://7dbd31371ac8.ngrok-free.app/askAI";
-
-// Depois
-const BACKEND_URL = "http://localhost:3000/askAI";
+const BACKEND_URL = "http://192.168.1.10:3000/askAI";
 ```
-**Observação:** Se você estiver testando em um dispositivo móvel físico, substitua `localhost` pelo endereço IP da sua máquina na rede local (ex: `http://192.168.1.10:3000/askAI`).
+
+#### Opção 2: Usando `ngrok` (Recomendado para Dispositivos Físicos)
+
+O `ngrok` é uma ferramenta que cria um túnel seguro para o seu `localhost`, expondo seu servidor local à internet através de um URL público. Isso é especialmente útil quando o método de IP local não funciona ou quando você quer testar de uma rede diferente.
+
+1.  **Instale o `ngrok`**: Siga as instruções de instalação no [site oficial do ngrok](https://ngrok.com/download).
+
+2.  **Inicie o `ngrok`**: Depois de iniciar o seu servidor backend (que roda na porta 3000), abra um **novo terminal** e execute:
+    ```bash
+    ngrok http 3000
+    ```
+
+3.  **Copie a URL do `ngrok`**: O `ngrok` irá gerar um URL público (ex: `https://aleatorio-123.ngrok-free.app`). Copie este endereço.
+
+4.  **Atualize o código**: Abra o arquivo `src/utils/askAI.js` e cole a URL do `ngrok`, não se esquecendo de adicionar o caminho `/askAI` no final:
+    ```javascript
+    // Exemplo de como deve ficar
+    const BACKEND_URL = "https://aleatorio-123.ngrok-free.app/askAI";
+    ```
+**Importante:** A cada vez que você reiniciar o `ngrok`, um novo URL será gerado. Portanto, você precisará atualizar o `BACKEND_URL` no código sempre que iniciar o `ngrok` novamente.
 
 ## Rodando o Projeto
 
