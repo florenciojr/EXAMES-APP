@@ -1,6 +1,6 @@
 // utils/askAI.js
 export async function askAI(questionText, options, history = []) {
-  const BACKEND_URL = "https://7dbd31371ac8.ngrok-free.app/askAI"; // atualiza sempre o ngrok
+  const BACKEND_URL = "https://01c777a5b406.ngrok-free.app/askAI";// 👈 IP do PC
 
   if (!questionText || !options || !options.length) {
     console.error("⚠️ questionText ou options inválidos");
