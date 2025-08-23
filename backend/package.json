@@ -1,44 +1,27 @@
 {
-  "name": "exames-app",
-  "license": "0BSD",
+  "name": "exames-app-backend",
   "version": "1.0.0",
-  "main": "App.js",
+  "description": "Backend para o app de exames com MySQL",
+  "main": "app.js",
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "init-db": "node -e \"console.log('Execute o arquivo database.sql no phpMyAdmin'); console.log('Acesse: http://localhost/phpmyadmin');\""
   },
   "dependencies": {
-    "@azure-rest/ai-inference": "^1.0.0-beta.6",
-    "@azure/core-auth": "^1.10.0",
-    "@azure/core-sse": "^2.3.0",
-    "@react-navigation/native": "^7.1.17",
-    "@react-navigation/stack": "^7.4.7",
+    "express": "^4.18.2",
+    "mysql2": "^3.6.3",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
     "cors": "^2.8.5",
-    "expo": "~53.0.20",
-    "expo-status-bar": "~2.2.3",
-    "express": "^5.1.0",
-    "node-fetch": "^3.3.2",
-    "openai": "^5.13.1",
-    "react": "19.0.0",
-    "react-native": "0.79.5",
-    "react-native-dotenv": "^3.4.11"
+    "dotenv": "^16.3.1",
+    "express-validator": "^7.0.1",
+    "node-fetch": "^2.7.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.20.0",
-    "metro-react-native-babel-preset": "^0.77.0"
+    "nodemon": "^3.0.1"
   },
-  "private": true,
-  "description": "",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/florenciojr/EXAMES-APP.git"
-  },
-  "keywords": [],
-  "author": "",
-  "bugs": {
-    "url": "https://github.com/florenciojr/EXAMES-APP/issues"
-  },
-  "homepage": "https://github.com/florenciojr/EXAMES-APP#readme"
+  "keywords": ["exams", "education", "mysql"],
+  "author": "Florencio $JR5$",
+  "license": "MIT"
 }

@@ -1,301 +1,480 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
+  Alert,
   ScrollView,
   ActivityIndicator,
-  TextInput
-} from "react-native";
-import { askAI } from "../utils/askAI";
+  TextInput,
+  KeyboardAvoidingView,
+  Platform
+} from 'react-native';
+import { examService } from '../services/examService';
+import { askAI } from '../utils/askAI';
 
 export default function QuestionScreen({ route, navigation }) {
-  const { exam } = route.params || {};
-  if (!exam || !exam.questions) {
+  const { exam } = route.params;
+  
+  // Estados das questões
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const [score, setScore] = useState(0);
+  const [answeredQuestions, setAnsweredQuestions] = useState([]);
+  const [showExplanation, setShowExplanation] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  // Estados do chat IA
+  const [chatHistory, setChatHistory] = useState([]);
+  const [loadingAI, setLoadingAI] = useState(false);
+  const [userInput, setUserInput] = useState('');
+  const [isChatMinimized, setIsChatMinimized] = useState(false);
+
+  const currentQuestion = exam.questions[currentQuestionIndex];
+
+  useEffect(() => {
+    // Limpar chat quando mudar de questão
+    setChatHistory([]);
+    setUserInput('');
+  }, [currentQuestionIndex]);
+
+  const handleAnswerSelect = (answerIndex) => {
+    setSelectedAnswer(answerIndex);
+    
+    const isCorrect = answerIndex === currentQuestion.answer;
+    if (isCorrect) {
+      setScore(score + 1);
+    }
+
+    setAnsweredQuestions([
+      ...answeredQuestions,
+      {
+        question: currentQuestion.text,
+        userAnswer: answerIndex,
+        correctAnswer: currentQuestion.answer,
+        isCorrect: isCorrect,
+        explanation: currentQuestion.explanation
+      }
+    ]);
+
+    setShowExplanation(true);
+  };
+
+  const handleNextQuestion = () => {
+    if (currentQuestionIndex < exam.questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+      setSelectedAnswer(null);
+      setShowExplanation(false);
+    } else {
+      finishExam();
+    }
+  };
+
+  const handlePrevQuestion = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(currentQuestionIndex - 1);
+      setSelectedAnswer(null);
+      setShowExplanation(false);
+    }
+  };
+
+  const finishExam = async () => {
+    setLoading(true);
+    try {
+      await examService.saveExamHistory({
+        examType: exam.title,
+        questions: answeredQuestions,
+        score: score,
+        totalQuestions: exam.questions.length,
+        timeSpent: 0
+      });
+
+      Alert.alert(
+        'Exame Concluído!',
+        `Você acertou ${score} de ${exam.questions.length} questões.`,
+        [
+          {
+            text: 'Ver Resultados',
+            onPress: () => navigation.navigate('Progress')
+          },
+          {
+            text: 'Voltar aos Exames',
+            onPress: () => navigation.navigate('Exams')
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Erro ao salvar histórico:', error);
+      Alert.alert('Erro', 'Não foi possível salvar o histórico do exame');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!userInput.trim() || loadingAI) return;
+
+    // Adiciona mensagem do usuário ao chat
+    const userMessage = { role: 'user', parts: [{ text: userInput.trim() }] };
+    const newHistory = [...chatHistory, userMessage];
+    setChatHistory(newHistory);
+    setUserInput('');
+    setLoadingAI(true);
+
+    try {
+      // Chama a IA
+      const aiResponse = await askAI(
+        currentQuestion.text,
+        currentQuestion.options,
+        newHistory
+      );
+
+      // Adiciona resposta da IA ao chat
+      const aiMessage = { role: 'model', parts: [{ text: aiResponse }] };
+      setChatHistory([...newHistory, aiMessage]);
+    } catch (error) {
+      console.error('Erro ao chamar IA:', error);
+      const errorMessage = { role: 'model', parts: [{ text: 'Desculpe, tive um problema. Poderia tentar novamente?' }] };
+      setChatHistory([...newHistory, errorMessage]);
+    } finally {
+      setLoadingAI(false);
+    }
+  };
+
+  if (loading) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>Erro: Exame não encontrado</Text>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>Voltar</Text>
-        </TouchableOpacity>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Salvando resultados...</Text>
       </View>
     );
   }
 
-  const questions = exam.questions.slice(0, 5);
-  const [current, setCurrent] = useState(0);
-  const [answers, setAnswers] = useState(Array(questions.length).fill(null));
-  const [showResult, setShowResult] = useState(false);
-
-  // chat IA
-  const [chatHistory, setChatHistory] = useState([]);
-  const [loadingAI, setLoadingAI] = useState(false);
-  const [userInput, setUserInput] = useState("");
-
-  function handleSelect(idx) {
-    const newAnswers = [...answers];
-    newAnswers[current] = idx;
-    setAnswers(newAnswers);
-  }
-
-  function handleNext() {
-    if (current < questions.length - 1) {
-      setCurrent(current + 1);
-      setChatHistory([]); // limpa chat para próxima questão
-    } else {
-      setShowResult(true);
-    }
-  }
-
-  function handlePrev() {
-    if (current > 0) {
-      setCurrent(current - 1);
-    }
-  }
-
-  function getScore() {
-    let score = 0;
-    for (let i = 0; i < answers.length; i++) {
-      if (questions[i].answer === answers[i]) score++;
-    }
-    return score;
-  }
-
-  async function handleSendMessage() {
-    if (!userInput.trim()) return;
-
-    // adiciona mensagem do aluno
-    const newHistory = [
-      ...chatHistory,
-      { role: "user", parts: [{ text: userInput }] }
-    ];
-    setChatHistory(newHistory);
-    setUserInput("");
-    setLoadingAI(true);
-
-    // envia tudo para IA (pergunta + histórico)
-    const response = await askAI(
-      questions[current].text,
-      questions[current].options,
-      newHistory
-    );
-
-    const updatedHistory = [
-      ...newHistory,
-      { role: "model", parts: [{ text: response }] }
-    ];
-    setChatHistory(updatedHistory);
-    setLoadingAI(false);
-  }
-
-  if (showResult) {
+  if (!currentQuestion) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>Resultado Final 🎉</Text>
-        <Text style={styles.resultText}>
-          Você acertou {getScore()} de {questions.length} questões!
-        </Text>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>Voltar</Text>
-        </TouchableOpacity>
+        <Text>Carregando questão...</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      {/* Barra de Progresso */}
-      <View style={styles.progressBar}>
-        <View
-          style={[
-            styles.progressFill,
-            { width: `${((current + 1) / questions.length) * 100}%` }
-          ]}
-        />
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={100}
+    >
+      {/* Cabeçalho com progresso */}
+      <View style={styles.header}>
+        <Text style={styles.progressText}>
+          Questão {currentQuestionIndex + 1} de {exam.questions.length}
+        </Text>
+        <Text style={styles.scoreText}>Acertos: {score}/{exam.questions.length}</Text>
       </View>
 
-      <Text style={styles.title}>{exam.title}</Text>
-      <Text style={styles.question}>
-        Pergunta {current + 1}: {questions[current].text}
-      </Text>
-
-      {/* Opções */}
-      <View style={styles.optionsContainer}>
-        {questions[current].options.map((option, idx) => (
-          <TouchableOpacity
-            key={idx}
-            style={[
-              styles.optionCard,
-              answers[current] === idx && styles.optionSelected
-            ]}
-            onPress={() => handleSelect(idx)}
-          >
-            <Text style={styles.optionText}>{option}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Chat IA */}
-      <View style={styles.chatBox}>
-        <Text style={styles.chatTitle}>Explicador Virtual 🤖</Text>
-        <ScrollView style={styles.chatHistory}>
-          {chatHistory.map((msg, idx) => (
-            <View
-              key={idx}
+      {/* Questão atual */}
+      <ScrollView style={styles.questionSection}>
+        <View style={styles.questionContainer}>
+          <Text style={styles.questionText}>{currentQuestion.text}</Text>
+          
+          {/* Opções de resposta */}
+          {currentQuestion.options.map((option, index) => (
+            <TouchableOpacity
+              key={index}
               style={[
-                styles.chatBubble,
-                msg.role === "user"
-                  ? styles.chatBubbleUser
-                  : styles.chatBubbleAI
+                styles.optionButton,
+                selectedAnswer === index && styles.selectedOption,
+                showExplanation && index === currentQuestion.answer && styles.correctOption,
+                showExplanation && selectedAnswer === index && selectedAnswer !== currentQuestion.answer && styles.wrongOption
               ]}
+              onPress={() => !showExplanation && handleAnswerSelect(index)}
+              disabled={showExplanation}
             >
-              <Text
-                style={{
-                  color: msg.role === "user" ? "#fff" : "#000"
-                }}
-              >
-                {msg.parts[0].text}
-              </Text>
-            </View>
+              <Text style={styles.optionText}>{option}</Text>
+            </TouchableOpacity>
           ))}
-          {loadingAI && <ActivityIndicator size="small" color="#007AFF" />}
-        </ScrollView>
 
-        {/* Input do aluno */}
-        <View style={styles.inputRow}>
-          <TextInput
-            style={styles.input}
-            placeholder="Digite sua resposta..."
-            value={userInput}
-            onChangeText={setUserInput}
-          />
-          <TouchableOpacity style={styles.sendButton} onPress={handleSendMessage}>
-            <Text style={styles.sendButtonText}>Enviar</Text>
-          </TouchableOpacity>
+          {/* Explicação */}
+          {showExplanation && (
+            <View style={styles.explanationContainer}>
+              <Text style={styles.explanationTitle}>
+                {selectedAnswer === currentQuestion.answer ? '✅ Correto!' : '❌ Incorreto'}
+              </Text>
+              <Text style={styles.explanationText}>{currentQuestion.explanation}</Text>
+            </View>
+          )}
         </View>
-      </View>
+
+        {/* Chat IA - Mini Chat */}
+        <View style={styles.chatContainer}>
+          <TouchableOpacity 
+            style={styles.chatHeader}
+            onPress={() => setIsChatMinimized(!isChatMinimized)}
+          >
+            <Text style={styles.chatTitle}>💬 Explicador Virtual {isChatMinimized ? '▶' : '▼'}</Text>
+          </TouchableOpacity>
+
+          {!isChatMinimized && (
+            <>
+              <ScrollView style={styles.chatMessages} nestedScrollEnabled={true}>
+                {chatHistory.map((message, index) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.messageBubble,
+                      message.role === 'user' ? styles.userMessage : styles.aiMessage
+                    ]}
+                  >
+                    <Text style={[
+                      styles.messageText,
+                      message.role === 'user' && styles.userMessageText
+                    ]}>
+                      {message.parts[0].text}
+                    </Text>
+                  </View>
+                ))}
+                {loadingAI && (
+                  <View style={styles.aiMessage}>
+                    <ActivityIndicator size="small" color="#666" />
+                  </View>
+                )}
+              </ScrollView>
+
+              <View style={styles.chatInputContainer}>
+                <TextInput
+                  style={styles.chatInput}
+                  placeholder="Pergunte ao explicador..."
+                  value={userInput}
+                  onChangeText={setUserInput}
+                  multiline
+                  maxLength={500}
+                />
+                <TouchableOpacity 
+                  style={styles.sendButton} 
+                  onPress={handleSendMessage}
+                  disabled={loadingAI || !userInput.trim()}
+                >
+                  <Text style={styles.sendButtonText}>Enviar</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+        </View>
+      </ScrollView>
 
       {/* Navegação */}
-      <View style={styles.slideNav}>
+      <View style={styles.navigation}>
         <TouchableOpacity
-          style={[styles.slideButton, current === 0 && { opacity: 0.5 }]}
-          onPress={handlePrev}
-          disabled={current === 0}
+          style={[styles.navButton, currentQuestionIndex === 0 && styles.disabledButton]}
+          onPress={handlePrevQuestion}
+          disabled={currentQuestionIndex === 0}
         >
-          <Text style={styles.slideButtonText}>Anterior</Text>
+          <Text style={styles.navButtonText}>Anterior</Text>
         </TouchableOpacity>
+
         <TouchableOpacity
-          style={[
-            styles.slideButton,
-            answers[current] === null && { backgroundColor: "#ccc" }
-          ]}
-          onPress={handleNext}
-          disabled={answers[current] === null}
+          style={[styles.navButton, styles.nextButton]}
+          onPress={handleNextQuestion}
         >
-          <Text style={styles.slideButtonText}>
-            {current === questions.length - 1 ? "Finalizar" : "Seguinte"}
+          <Text style={styles.navButtonText}>
+            {currentQuestionIndex === exam.questions.length - 1 ? 'Finalizar' : 'Próxima'}
           </Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f9f9f9", padding: 20 },
-  title: { fontSize: 22, fontWeight: "bold", marginVertical: 10, textAlign: "center" },
-  question: { fontSize: 18, marginBottom: 15, textAlign: "center" },
-
-  progressBar: {
-    height: 8,
-    backgroundColor: "#e0e0e0",
-    borderRadius: 4,
-    overflow: "hidden",
-    marginBottom: 15
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
   },
-  progressFill: {
-    height: 8,
-    backgroundColor: "#007AFF"
-  },
-
-  optionsContainer: { marginBottom: 20 },
-  optionCard: {
-    backgroundColor: "#fff",
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 15,
-    borderRadius: 12,
-    marginVertical: 6,
-    elevation: 2
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
-  optionSelected: { backgroundColor: "#b3e5fc" },
-  optionText: { fontSize: 16 },
-
-  chatBox: {
+  progressText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333'
+  },
+  scoreText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#007AFF'
+  },
+  questionSection: {
     flex: 1,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 15,
-    elevation: 2
+    padding: 15,
   },
-  chatTitle: { fontWeight: "bold", fontSize: 16, marginBottom: 6 },
-  chatHistory: { maxHeight: 150, marginBottom: 10 },
-  chatBubble: {
-    padding: 10,
+  questionContainer: {
+    backgroundColor: '#fff',
+    padding: 20,
     borderRadius: 10,
-    marginVertical: 4,
-    maxWidth: "80%"
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3
   },
-  chatBubbleUser: { backgroundColor: "#007AFF", alignSelf: "flex-end" },
-  chatBubbleAI: { backgroundColor: "#e0e0e0", alignSelf: "flex-start" },
-
-  inputRow: {
-    flexDirection: "row",
-    alignItems: "center"
+  questionText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    color: '#333',
+    textAlign: 'center'
   },
-  input: {
-    flex: 1,
-    borderColor: "#ccc",
-    borderWidth: 1,
+  optionButton: {
+    backgroundColor: '#f8f9fa',
+    padding: 15,
     borderRadius: 8,
-    padding: 8,
-    marginRight: 8
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: '#dee2e6'
+  },
+  selectedOption: {
+    backgroundColor: '#e3f2fd',
+    borderColor: '#2196f3'
+  },
+  correctOption: {
+    backgroundColor: '#e8f5e8',
+    borderColor: '#4caf50'
+  },
+  wrongOption: {
+    backgroundColor: '#ffebee',
+    borderColor: '#f44336'
+  },
+  optionText: {
+    fontSize: 16,
+    color: '#333'
+  },
+  explanationContainer: {
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#2196f3'
+  },
+  explanationTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333'
+  },
+  explanationText: {
+    fontSize: 16,
+    color: '#666',
+    lineHeight: 22
+  },
+  chatContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3
+  },
+  chatHeader: {
+    backgroundColor: '#007AFF',
+    padding: 15,
+  },
+  chatTitle: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16
+  },
+  chatMessages: {
+    maxHeight: 200,
+    padding: 10,
+  },
+  messageBubble: {
+    padding: 12,
+    borderRadius: 8,
+    marginVertical: 5,
+    maxWidth: '80%',
+  },
+  userMessage: {
+    backgroundColor: '#007AFF',
+    alignSelf: 'flex-end',
+    marginLeft: '20%'
+  },
+  aiMessage: {
+    backgroundColor: '#f0f0f0',
+    alignSelf: 'flex-start',
+    marginRight: '20%'
+  },
+  messageText: {
+    fontSize: 14,
+  },
+  userMessageText: {
+    color: '#fff'
+  },
+  chatInputContainer: {
+    flexDirection: 'row',
+    padding: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    alignItems: 'center'
+  },
+  chatInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 20,
+    padding: 10,
+    marginRight: 10,
+    maxHeight: 100
   },
   sendButton: {
-    backgroundColor: "#007AFF",
+    backgroundColor: '#007AFF',
     padding: 10,
-    borderRadius: 8
+    borderRadius: 20,
+    minWidth: 60,
+    alignItems: 'center'
   },
-  sendButtonText: { color: "#fff", fontWeight: "bold" },
-
-  slideNav: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 10
+  sendButtonText: {
+    color: '#fff',
+    fontWeight: 'bold'
   },
-  slideButton: {
-    backgroundColor: "#007AFF",
-    padding: 12,
+  navigation: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 15,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#eee'
+  },
+  navButton: {
+    backgroundColor: '#007AFF',
+    padding: 15,
     borderRadius: 8,
-    alignItems: "center",
-    width: "45%"
+    minWidth: 120,
+    alignItems: 'center'
   },
-  slideButtonText: { color: "#fff", fontSize: 16 },
-
-  resultText: { fontSize: 18, marginVertical: 20, textAlign: "center" },
-
-  backButton: {
+  nextButton: {
+    backgroundColor: '#28a745'
+  },
+  disabledButton: {
+    backgroundColor: '#ccc'
+  },
+  navButtonText: {
+    color: '#fff',
+    fontWeight: 'bold'
+  },
+  loadingText: {
     marginTop: 20,
-    backgroundColor: "#ccc",
-    padding: 12,
-    borderRadius: 8,
-    alignItems: "center"
-  },
-  backButtonText: { color: "#333", fontSize: 16 }
+    textAlign: 'center',
+    color: '#666'
+  }
 });

@@ -1,0 +1,624 @@
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  StyleSheet,
+  Image,
+  Alert,
+  RefreshControl,
+  Modal,
+  Switch,
+  TextInput
+} from 'react-native';
+import { authService } from '../services/authService';
+import { examService } from '../services/examService';
+import { LinearGradient } from 'expo-linear-gradient';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import * as Animatable from 'react-native-animatable';
+
+export default function HomeScreen({ navigation, route }) {
+  const { name, email } = route.params || {};
+  const [userStats, setUserStats] = useState({
+    totalExams: 0,
+    completedExams: 0,
+    averageScore: 0,
+    totalQuestions: 0,
+    correctAnswers: 0
+  });
+  const [recentExams, setRecentExams] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [settingsVisible, setSettingsVisible] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
+  const [dailyGoal, setDailyGoal] = useState(10);
+
+  useEffect(() => {
+    loadUserData();
+  }, []);
+
+  const loadUserData = async () => {
+    try {
+      setLoading(true);
+      // Carregar estatísticas do usuário
+      const stats = await examService.getUserStats();
+      setUserStats(stats);
+      
+      // Carregar exames recentes
+      const recent = await examService.getRecentExams();
+      setRecentExams(recent);
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+      Alert.alert('Erro', 'Não foi possível carregar os dados');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadUserData();
+  };
+
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+      navigation.navigate('Login');
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+    }
+  };
+
+  const handleStartQuickExam = () => {
+    navigation.navigate('Exams');
+  };
+
+  const handleSeeProgress = () => {
+    navigation.navigate('Progress');
+  };
+
+  const handleSeeAllExams = () => {
+    navigation.navigate('Exams');
+  };
+
+  const handleExamPress = (exam) => {
+    navigation.navigate('Question', { exam });
+  };
+
+  const renderStatsCard = () => (
+    <LinearGradient
+      colors={['#6a11cb', '#2575fc']}
+      style={styles.statsCard}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+    >
+      <Text style={styles.statsTitle}>Seu Progresso</Text>
+      <View style={styles.statsGrid}>
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>{userStats.completedExams}</Text>
+          <Text style={styles.statLabel}>Exames Feitos</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>{userStats.averageScore}%</Text>
+          <Text style={styles.statLabel}>Pontuação Média</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>{userStats.correctAnswers}/{userStats.totalQuestions}</Text>
+          <Text style={styles.statLabel}>Questões Certas</Text>
+        </View>
+      </View>
+    </LinearGradient>
+  );
+
+  const renderQuickActions = () => (
+    <View style={styles.quickActions}>
+      <Text style={styles.sectionTitle}>Ações Rápidas</Text>
+      <View style={styles.actionsGrid}>
+        <TouchableOpacity 
+          style={styles.actionButton}
+          onPress={handleStartQuickExam}
+        >
+          <LinearGradient
+            colors={['#FF416C', '#FF4B2B']}
+            style={styles.actionGradient}
+          >
+            <Icon name="play-arrow" size={24} color="#fff" />
+            <Text style={styles.actionText}>Iniciar Exame</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.actionButton}
+          onPress={handleSeeProgress}
+        >
+          <LinearGradient
+            colors={['#36D1DC', '#5B86E5']}
+            style={styles.actionGradient}
+          >
+            <Icon name="trending-up" size={24} color="#fff" />
+            <Text style={styles.actionText}>Ver Progresso</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.actionButton}
+          onPress={() => setSettingsVisible(true)}
+        >
+          <LinearGradient
+            colors={['#8E2DE2', '#4A00E0']}
+            style={styles.actionGradient}
+          >
+            <Icon name="settings" size={24} color="#fff" />
+            <Text style={styles.actionText}>Configurações</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.actionButton}
+          onPress={() => navigation.navigate('StudyMaterials')}
+        >
+          <LinearGradient
+            colors={['#f46b45', '#eea849']}
+            style={styles.actionGradient}
+          >
+            <Icon name="menu-book" size={24} color="#fff" />
+            <Text style={styles.actionText}>Material de Estudo</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  const renderRecentExams = () => (
+    <View style={styles.recentExams}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Exames Recentes</Text>
+        <TouchableOpacity onPress={handleSeeAllExams}>
+          <Text style={styles.seeAllText}>Ver todos</Text>
+        </TouchableOpacity>
+      </View>
+      
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        {recentExams.map((exam, index) => (
+          <Animatable.View 
+            key={exam.id}
+            animation="fadeInRight"
+            delay={index * 100}
+            style={styles.examCard}
+          >
+            <TouchableOpacity onPress={() => handleExamPress(exam)}>
+              <LinearGradient
+                colors={['#667eea', '#764ba2']}
+                style={styles.examGradient}
+              >
+                <Text style={styles.examSubject}>{exam.subject}</Text>
+                <Text style={styles.examTitle}>{exam.title}</Text>
+                <View style={styles.examStats}>
+                  <Text style={styles.examStat}>
+                    <Icon name="question-answer" size={14} /> {exam.questions?.length || 0} questões
+                  </Text>
+                  <Text style={styles.examStat}>
+                    <Icon name="schedule" size={14} /> {exam.duration_minutes} min
+                  </Text>
+                </View>
+                <Text style={styles.examDifficulty}>{exam.difficulty}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animatable.View>
+        ))}
+      </ScrollView>
+    </View>
+  );
+
+  const renderDailyGoal = () => (
+    <View style={styles.dailyGoal}>
+      <Text style={styles.sectionTitle}>Meta Diária</Text>
+      <LinearGradient
+        colors={['#4facfe', '#00f2fe']}
+        style={styles.goalCard}
+      >
+        <View style={styles.goalProgress}>
+          <Text style={styles.goalText}>5/{dailyGoal} questões hoje</Text>
+          <View style={styles.progressBar}>
+            <View style={[styles.progressFill, { width: `${(5/dailyGoal)*100}%` }]} />
+          </View>
+        </View>
+        <TouchableOpacity style={styles.goalButton}>
+          <Text style={styles.goalButtonText}>Aumentar Meta</Text>
+        </TouchableOpacity>
+      </LinearGradient>
+    </View>
+  );
+
+  const renderSettingsModal = () => (
+    <Modal
+      visible={settingsVisible}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={() => setSettingsVisible(false)}
+    >
+      <View style={styles.modalContainer}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Configurações</Text>
+          
+          <View style={styles.settingItem}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Notificações</Text>
+              <Text style={styles.settingDescription}>Receber lembretes de estudo</Text>
+            </View>
+            <Switch
+              value={notificationsEnabled}
+              onValueChange={setNotificationsEnabled}
+            />
+          </View>
+
+          <View style={styles.settingItem}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Modo Escuro</Text>
+              <Text style={styles.settingDescription}>Tema escuro para estudo noturno</Text>
+            </View>
+            <Switch
+              value={darkMode}
+              onValueChange={setDarkMode}
+            />
+          </View>
+
+          <View style={styles.settingItem}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Meta Diária</Text>
+              <Text style={styles.settingDescription}>Número de questões por dia</Text>
+            </View>
+            <TextInput
+              style={styles.goalInput}
+              value={dailyGoal.toString()}
+              onChangeText={(text) => setDailyGoal(Number(text))}
+              keyboardType="numeric"
+            />
+          </View>
+
+          <TouchableOpacity 
+            style={styles.modalCloseButton}
+            onPress={() => setSettingsVisible(false)}
+          >
+            <Text style={styles.modalCloseText}>Fechar</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Image 
+          source={require('../assets/study-loading.gif')} 
+          style={styles.loadingImage}
+        />
+        <Text style={styles.loadingText}>Carregando seu progresso...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <ScrollView
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        {/* Header com boas-vindas */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.welcomeText}>Olá, {name}!</Text>
+            <Text style={styles.subWelcomeText}>Pronto para aprender hoje?</Text>
+          </View>
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+            <Icon name="exit-to-app" size={24} color="#666" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Cartão de estatísticas */}
+        {renderStatsCard()}
+
+        {/* Ações rápidas */}
+        {renderQuickActions()}
+
+        {/* Meta diária */}
+        {renderDailyGoal()}
+
+        {/* Exames recentes */}
+        {renderRecentExams()}
+
+        {/* Dica do dia */}
+        <View style={styles.tipOfTheDay}>
+          <Text style={styles.sectionTitle}>Dica do Dia</Text>
+          <LinearGradient
+            colors={['#ff9a9e', '#fad0c4']}
+            style={styles.tipCard}
+          >
+            <Icon name="lightbulb-outline" size={24} color="#fff" />
+            <Text style={styles.tipText}>
+              Estude em sessões de 25 minutos com pausas de 5 minutos (Técnica Pomodoro)
+            </Text>
+          </LinearGradient>
+        </View>
+      </ScrollView>
+
+      {/* Modal de configurações */}
+      {renderSettingsModal()}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f7',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  loadingImage: {
+    width: 100,
+    height: 100,
+    marginBottom: 20,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    paddingTop: 40,
+    backgroundColor: '#fff',
+  },
+  welcomeText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  subWelcomeText: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 4,
+  },
+  logoutButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+  },
+  statsCard: {
+    margin: 16,
+    padding: 20,
+    borderRadius: 16,
+    elevation: 4,
+  },
+  statsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 16,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  quickActions: {
+    padding: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 16,
+  },
+  actionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  actionButton: {
+    width: '48%',
+    height: 100,
+    marginBottom: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  actionGradient: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  actionText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  recentExams: {
+    padding: 16,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  seeAllText: {
+    color: '#007AFF',
+    fontWeight: '500',
+  },
+  examCard: {
+    width: 200,
+    height: 150,
+    marginRight: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  examGradient: {
+    flex: 1,
+    padding: 16,
+    justifyContent: 'space-between',
+  },
+  examSubject: {
+    color: '#fff',
+    fontSize: 12,
+    opacity: 0.8,
+  },
+  examTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginVertical: 8,
+  },
+  examStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  examStat: {
+    color: '#fff',
+    fontSize: 12,
+  },
+  examDifficulty: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+    alignSelf: 'flex-end',
+    marginTop: 8,
+  },
+  dailyGoal: {
+    padding: 16,
+  },
+  goalCard: {
+    padding: 20,
+    borderRadius: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  goalProgress: {
+    flex: 1,
+  },
+  goalText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#fff',
+    borderRadius: 3,
+  },
+  goalButton: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  goalButtonText: {
+    color: '#4facfe',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  tipOfTheDay: {
+    padding: 16,
+    marginBottom: 32,
+  },
+  tipCard: {
+    padding: 20,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tipText: {
+    color: '#fff',
+    marginLeft: 12,
+    flex: 1,
+    fontWeight: '500',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    width: '90%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  settingItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  settingInfo: {
+    flex: 1,
+  },
+  settingLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  settingDescription: {
+    fontSize: 14,
+    color: '#666',
+  },
+  goalInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 8,
+    width: 60,
+    textAlign: 'center',
+  },
+  modalCloseButton: {
+    backgroundColor: '#007AFF',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  modalCloseText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+});

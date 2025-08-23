@@ -1,21 +1,26 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
+import { Provider as PaperProvider } from 'react-native-paper';
+import AppNavigator from './src/navigation/AppNavigator';
+import LoginScreen from './src/screens/LoginScreen';
 import { createStackNavigator } from '@react-navigation/stack';
-
-import LoginScreen from '../screens/LoginScreen';
-import ExamsScreen from '../screens/ExamsScreen';
-import QuestionScreen from '../screens/QuestionScreen';
 
 const Stack = createStackNavigator();
 
-export default function AppNavigator() {
+export default function App() {
   return (
-    <NavigationContainer>
-      <Stack.Navigator initialRouteName="Login">
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Exams" component={ExamsScreen} />
-        <Stack.Screen name="Question" component={QuestionScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <PaperProvider>
+      <NavigationContainer>
+        <Stack.Navigator 
+          initialRouteName="Login"
+          screenOptions={{
+            headerShown: false
+          }}
+        >
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="Main" component={AppNavigator} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </PaperProvider>
   );
 }
