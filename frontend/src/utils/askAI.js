@@ -1,6 +1,7 @@
 // Utilitário para integração com IA
 export async function askAI(questionText, options, history = []) {
-  const BACKEND_URL = "https://587bf9ce06c5.ngrok-free.app/askAI";
+  // ✅ Mude para a nova rota
+  const BACKEND_URL = "https://bde7c687fc71.ngrok-free.app/api/ai/ask";
 
   if (!questionText || !options || !options.length) {
     console.error("⚠️ questionText ou options inválidos");
@@ -32,13 +33,20 @@ export async function askAI(questionText, options, history = []) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Erro do backend:", errorText);
-      return `Erro do backend: ${errorText}`;
+      console.error("Erro do backend:", response.status, errorText);
+      return `Erro do backend (${response.status}): ${errorText}`;
     }
 
     const data = await response.json();
-    console.log("Resposta da IA recebida");
-    return data.answer || "Resposta vazia da IA";
+    console.log("Resposta da IA recebida:", data);
+    
+    // ✅ Agora a resposta vem com { success, answer }
+    if (data.success) {
+      return data.answer;
+    } else {
+      return data.error || "Erro na resposta da IA";
+    }
+    
   } catch (err) {
     console.error("Erro ao conectar ao backend:", err);
     return "Erro ao conectar ao backend. Verifique sua conexão.";
