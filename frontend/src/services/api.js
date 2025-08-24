@@ -2,7 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ✅ CORREÇÃO: Use apenas o IP/porta SEM /api no final
-const API_BASE_URL = 'http://192.168.1.2:5000'; // SEM /api no final
+const API_BASE_URL = 'http://192.168.1.4:5000'; // SEM /api no final
 
 console.log('🔗 Configurando API com baseURL:', API_BASE_URL);
 

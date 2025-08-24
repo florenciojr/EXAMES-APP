@@ -6,7 +6,41 @@ const fs = require('fs');
 
 const app = express();
 
-// ... código anterior ...
+
+// Middleware básico
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
+
+// ✅ FALLBACKS PRIMEIRO (antes de qualquer rota)
+app.post('/auth/register', (req, res) => {
+  console.log('⚠️  Redirecionando /auth/register para /api/auth/register');
+  req.originalUrl = '/api/auth/register';
+  req.url = '/api/auth/register';
+  app.handle(req, res);
+});
+
+app.post('/auth/login', (req, res) => {
+  console.log('⚠️  Redirecionando /auth/login para /api/auth/login');
+  req.originalUrl = '/api/auth/login';
+  req.url = '/api/auth/login';
+  app.handle(req, res);
+});
+
+// ✅ DEPOIS carrege as rotas auth manualmente
+console.log('🔍 Carregando rotas auth manualmente...');
+try {
+  const authRoutes = require('./routes/auth');
+  app.use('/api/auth', authRoutes);
+  console.log('✅ Rotas auth carregadas manualmente com sucesso!');
+} catch (error) {
+  console.error('❌ Erro ao carregar auth manualmente:', error);
+}
+
+// Middleware de logging para debug
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+  next();
+});
 
 // ✅ ROTAS DE TESTE RÁPIDO PARA BD
 app.get('/api/test/db', async (req, res) => {
@@ -33,6 +67,7 @@ app.get('/api/test/db', async (req, res) => {
     });
   }
 });
+
 
 app.get('/api/test/exams', async (req, res) => {
   try {
@@ -131,20 +166,7 @@ app.get('/exams/:id', (req, res) => {
   app.handle(req, res);
 });
 
-// ... resto do código ...
 
-// Middleware básico
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-
-// Middleware de logging para debug
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
-  if (req.method === 'POST' && (req.originalUrl.includes('login') || req.originalUrl.includes('save-history'))) {
-    console.log('Body received:', JSON.stringify(req.body, null, 2));
-  }
-  next();
-});
 
 // ✅ FUNÇÃO MELHORADA PARA CARREGAR ROTAS
 const loadRoutes = (routePath, routeName) => {
@@ -486,7 +508,7 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
   console.log(`📍 Local: http://localhost:${PORT}`);
-  console.log(`🌐 Rede: http://192.168.1.2:${PORT}`);
+  console.log(`🌐 Rede: http://192.168.1.4:${PORT}`);
   console.log(`📊 Health Check: http://localhost:${PORT}/api/health`);
   console.log(`🔍 Debug Routes: http://localhost:${PORT}/api/debug/routes`);
   console.log(`📝 Exams: http://localhost:${PORT}/api/exams`);
@@ -499,7 +521,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('   - Rotas de exames (/api/exams)');
   console.log('   - Fallback para compatibilidade (/auth/login)');
   console.log('   - Sistema de rotas resiliente');
-  console.log(`🌐 Rede: http://192.168.1.2:${PORT}`);
+  console.log(`🌐 Rede: http://192.168.1.4:${PORT}`);
   console.log('');
   console.log('📊 TESTES RÁPIDOS:');
   console.log(`   - Health Check: http://localhost:${PORT}/api/health`);
