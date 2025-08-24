@@ -107,4 +107,56 @@ router.post('/:id/questions', async (req, res) => {
   }
 });
 
+// Verificar respostas de um exame
+router.post('/:id/verify', async (req, res) => {
+  try {
+    const { answers } = req.body; // { questionId: selectedOptionIndex }
+    const examId = req.params.id;
+    
+    console.log('Verificando respostas para o exame:', examId);
+    
+    // Buscar todas as questões do exame
+    const questions = await Exam.getQuestions(examId);
+    
+    // Formatar as questões igual no GET
+    const formattedQuestions = questions.map(q => ({
+      id: q.id,
+      correctAnswer: ['a', 'b', 'c', 'd'].indexOf(q.correct_answer.toLowerCase())
+    }));
+    
+    // Calcular pontuação
+    let score = 0;
+    const results = [];
+    
+    for (const question of formattedQuestions) {
+      const userAnswer = answers[question.id];
+      const isCorrect = userAnswer === question.correctAnswer;
+      
+      if (isCorrect) {
+        score++;
+      }
+      
+      results.push({
+        questionId: question.id,
+        correct: isCorrect,
+        correctAnswer: question.correctAnswer
+      });
+    }
+    
+    const totalQuestions = formattedQuestions.length;
+    const percentage = Math.round((score / totalQuestions) * 100);
+    
+    res.json({
+      score,
+      totalQuestions,
+      percentage,
+      results
+    });
+    
+  } catch (error) {
+    console.error('Erro ao verificar respostas:', error);
+    res.status(500).json({ message: 'Erro interno do servidor' });
+  }
+});
+
 module.exports = router;

@@ -1,3 +1,4 @@
+// src/screens/ExamsScreen.js
 import React, { useState, useEffect } from 'react';
 import { 
   View, 
@@ -6,81 +7,87 @@ import {
   FlatList, 
   StyleSheet, 
   ActivityIndicator,
-  Alert 
+  Alert,
+  RefreshControl
 } from 'react-native';
 import { examService } from '../services/examService';
 import { authService } from '../services/authService';
 
-export default function ExamsScreen({ route, navigation }) {
-  const { name } = route.params || {};
+export default function ExamsScreen({ navigation }) {
   const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    fetchExams();
+    loadExams();
   }, []);
 
-  const fetchExams = async () => {
+  const loadExams = async () => {
     try {
       setLoading(true);
-      console.log('🔄 Buscando exames da API...');
+      console.log('🔄 Buscando exames...');
       
-      // Buscar lista de exames
-      const examsList = await examService.getExams();
-      console.log('📋 Exames da API (lista):', examsList);
+      const response = await examService.getExams();
       
-      // Para cada exame, buscar os dados COMPLETOS com questões
-      const examsWithQuestions = await Promise.all(
-        examsList.map(async (exam) => {
-          try {
-            console.log(`🔍 Buscando exame completo: ${exam.id} - ${exam.title}`);
-            const fullExam = await examService.getExam(exam.id);
-            
-            // ✅ LOG CRÍTICO - Verifique o que está vindo da API
-            console.log(`📦 Exame ${exam.id} COMPLETO:`, JSON.stringify(fullExam, null, 2));
-            console.log(`❓ Questões do exame ${exam.id}:`, fullExam.questions ? fullExam.questions.length : 'UNDEFINED');
-            
-            return fullExam;
-          } catch (error) {
-            console.log(`❌ Erro ao buscar exame ${exam.id}:`, error);
-            return { ...exam, questions: [] };
-          }
-        })
-      );
+      // ✅ VERIFIQUE A ESTRUTURA DA RESPOSTA
+      console.log('📦 Resposta completa:', response);
       
-      console.log('🎯 Exames finais com questões:', examsWithQuestions);
-      setExams(examsWithQuestions);
+      // A resposta pode vir em response.data ou response diretamente
+      const examsData = response.data || response;
+      
+      if (examsData && examsData.success !== false) {
+        // Pode vir como examsData.data ou examsData diretamente
+        const examsList = examsData.data || examsData;
+        console.log(`✅ ${examsList.length} exames carregados`);
+        setExams(Array.isArray(examsList) ? examsList : []);
+      } else {
+        console.log('⚠️  Nenhum exame encontrado ou estrutura inválida');
+        setExams([]);
+      }
       
     } catch (error) {
       console.error('❌ Erro ao buscar exames:', error);
       Alert.alert('Erro', 'Não foi possível carregar os exames');
+      setExams([]);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const handleExamPress = (exam) => {
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadExams();
+  };
+
+  const handleExamPress = async (exam) => {
     try {
-      console.log('🎯 Exame selecionado:', exam.title);
-      console.log('📊 Dados completos do exame:', exam);
-      console.log('❓ Questões no handle:', exam.questions);
-      console.log('🔢 Número de questões:', exam.questions ? exam.questions.length : 0);
+      console.log('🎯 Exame selecionado:', exam.id, exam.title);
       
-      // Verifica se o exame tem questões
-      if (!exam.questions || exam.questions.length === 0) {
-        console.log('⚠️  ALERTA: Exame sem questões!');
+      // ✅ BUSCAR DADOS COMPLETOS DO EXAME (COM QUESTÕES)
+      console.log('🔍 Buscando dados completos do exame...');
+      const examResponse = await examService.getExam(exam.id);
+      
+      // Verificar estrutura da resposta
+      const examData = examResponse.data || examResponse;
+      const fullExam = examData.data || examData;
+      
+      console.log('📦 Exame completo:', fullExam);
+      console.log('❓ Número de questões:', fullExam.questions ? fullExam.questions.length : 0);
+      
+      if (!fullExam.questions || fullExam.questions.length === 0) {
         Alert.alert('Aviso', 'Este exame não possui questões disponíveis.');
         return;
       }
       
-      console.log('✅ Navegando para questões...');
+      // ✅ NAVEGAR PARA A TELA DE QUESTÕES
       navigation.navigate('Question', { 
-        exam: exam
+        exam: fullExam
       });
       
     } catch (error) {
-      console.error('❌ Erro ao navegar para exame:', error);
-      Alert.alert('Erro', 'Não foi possível abrir o exame');
+      console.error('❌ Erro ao carregar exame:', error);
+      Alert.alert('Erro', 'Não foi possível carregar o exame');
     }
   };
 
@@ -90,6 +97,7 @@ export default function ExamsScreen({ route, navigation }) {
       navigation.navigate('Login');
     } catch (error) {
       console.error('Erro ao fazer logout:', error);
+      Alert.alert('Erro', 'Não foi possível fazer logout');
     }
   };
 
@@ -104,90 +112,97 @@ export default function ExamsScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Bem-vindo, {name} 👋</Text>
-      <Text style={styles.subtitle}>Escolha um exame:</Text>
+      <Text style={styles.title}>Exames Disponíveis</Text>
+      <Text style={styles.subtitle}>Escolha um exame para iniciar</Text>
 
-      {exams.length === 0 ? (
-        <Text style={styles.noExamsText}>Nenhum exame disponível no momento.</Text>
-      ) : (
-        <FlatList
-          data={exams}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
-            <TouchableOpacity 
-              style={styles.examButton} 
-              onPress={() => handleExamPress(item)}
-            >
-              <Text style={styles.examTitle}>{item.title}</Text>
-              <Text style={styles.examDetails}>
-                {item.subject} • {item.difficulty} • {item.questions?.length || 0} questões
+      <FlatList
+        data={exams}
+        keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
+        renderItem={({ item }) => (
+          <TouchableOpacity 
+            style={styles.examCard}
+            onPress={() => handleExamPress(item)}
+          >
+            <Text style={styles.examTitle}>{item.title}</Text>
+            <Text style={styles.examSubject}>{item.subject}</Text>
+            <Text style={styles.examDetails}>
+              {item.difficulty} • {item.total_questions || 'N'} questões • {item.duration_minutes || '?'} min
+            </Text>
+            {item.description && (
+              <Text style={styles.examDescription} numberOfLines={2}>
+                {item.description}
               </Text>
-              {item.description && (
-                <Text style={styles.examDescription} numberOfLines={2}>
-                  {item.description}
-                </Text>
-              )}
-            </TouchableOpacity>
-          )}
-          contentContainerStyle={styles.listContainer}
-        />
-      )}
+            )}
+          </TouchableOpacity>
+        )}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>
+            Nenhum exame disponível no momento.
+          </Text>
+        }
+        contentContainerStyle={styles.listContainer}
+      />
 
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutButtonText}>Sair</Text>
+        <Text style={styles.logoutText}>Sair</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
-// Mantenha os styles...}
-
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: '#f5f5f5', 
-    padding: 20 
+    backgroundColor: '#f5f5f7', 
+    padding: 16 
   },
   title: { 
     fontSize: 24, 
     fontWeight: 'bold', 
-    marginBottom: 10, 
     textAlign: 'center',
+    marginBottom: 8,
     color: '#333'
   },
   subtitle: { 
-    fontSize: 18, 
-    marginBottom: 20, 
+    fontSize: 16, 
     textAlign: 'center',
+    marginBottom: 24,
     color: '#666'
   },
   loadingText: {
-    marginTop: 20,
+    marginTop: 16,
     textAlign: 'center',
     color: '#666'
   },
   listContainer: {
+    flexGrow: 1,
     paddingBottom: 20
   },
-  examButton: {
+  examCard: {
     backgroundColor: '#fff',
     padding: 20,
     borderRadius: 12,
-    marginVertical: 8,
+    marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowRadius: 4,
+    elevation: 3
   },
   examTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 8,
     color: '#333'
+  },
+  examSubject: {
+    fontSize: 16,
+    color: '#007AFF',
+    marginBottom: 8,
+    fontWeight: '500'
   },
   examDetails: {
     fontSize: 14,
@@ -199,21 +214,23 @@ const styles = StyleSheet.create({
     color: '#888',
     fontStyle: 'italic'
   },
-  noExamsText: {
+  emptyText: {
     textAlign: 'center',
     fontSize: 16,
     color: '#666',
-    marginTop: 50
+    marginTop: 40,
+    padding: 20
   },
   logoutButton: {
-    backgroundColor: '#ff4444',
-    padding: 15,
+    backgroundColor: '#dc3545',
+    padding: 16,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 20
+    marginTop: 16
   },
-  logoutButtonText: {
+  logoutText: {
     color: '#fff',
-    fontSize: 16
+    fontSize: 16,
+    fontWeight: 'bold'
   }
 });

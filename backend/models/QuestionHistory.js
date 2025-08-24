@@ -1,7 +1,67 @@
 const { query } = require('../config/database');
 
 class QuestionHistory {
-  // Criar histórico de exame (CORRIGIDO)
+
+  // Estatísticas do usuário (MELHORADO)
+  static async getUserStats(userId) {
+    try {
+      const stats = await query(
+        `SELECT 
+           COUNT(*) as total_exams,
+           SUM(score) as total_score,
+           SUM(total_questions) as total_questions,
+           AVG(score * 100.0 / NULLIF(total_questions, 0)) as average_score,
+           SUM(time_spent) as total_time_spent,
+           MAX(completed_at) as last_exam_date
+         FROM exam_history 
+         WHERE user_id = ?`,
+        [userId]
+      );
+      
+      // Se não houver exames, retornar valores padrão
+      if (stats[0].total_exams === 0) {
+        return {
+          total_exams: 0,
+          total_score: 0,
+          total_questions: 0,
+          average_score: 0,
+          total_time_spent: 0,
+          last_exam_date: null
+        };
+      }
+      
+      return stats[0];
+    } catch (error) {
+      console.error('Erro ao buscar estatísticas:', error);
+      throw error;
+    }
+  }
+
+  // Novo método: Estatísticas por matéria
+  static async getStatsBySubject(userId) {
+    try {
+      const subjectStats = await query(
+        `SELECT 
+           exam_type,
+           COUNT(*) as exam_count,
+           AVG(score * 100.0 / NULLIF(total_questions, 0)) as average_score,
+           SUM(score) as total_score,
+           SUM(total_questions) as total_questions
+         FROM exam_history 
+         WHERE user_id = ?
+         GROUP BY exam_type
+         ORDER BY exam_count DESC`,
+        [userId]
+      );
+      
+      return subjectStats;
+    } catch (error) {
+      console.error('Erro ao buscar estatísticas por matéria:', error);
+      throw error;
+    }
+  }
+
+  // Criar histórico de exame
   static async create(historyData) {
     const { user_id, exam_type, score, total_questions, time_spent } = historyData;
     
@@ -30,11 +90,10 @@ class QuestionHistory {
     return result.insertId;
   }
 
-  // Adicionar questões ao histórico (CORRIGIDO)
+  // Adicionar questões ao histórico
   static async addQuestions(historyId, questions) {
     console.log('Adicionando questões para historyId:', historyId);
     
-    // Verificar se questions é um array válido
     if (!questions || !Array.isArray(questions) || questions.length === 0) {
       console.log('Nenhuma questão para adicionar ou questions não é array');
       return;
@@ -48,10 +107,11 @@ class QuestionHistory {
       try {
         // Garantir que nenhum campo seja undefined
         const safeQuestion = {
-          question_text: question.question || question.text || 'Questão sem texto',
-          user_answer: question.userAnswer || null,
-          correct_answer: question.correctAnswer || 'Resposta desconhecida',
-          is_correct: question.isCorrect !== undefined ? question.isCorrect : false,
+          question_text: question.question_text || question.question || question.text || 'Questão sem texto',
+          user_answer: question.user_answer || question.userAnswer || null,
+          correct_answer: question.correct_answer || question.correctAnswer || 'Resposta desconhecida',
+          is_correct: question.is_correct !== undefined ? question.is_correct : 
+                     (question.isCorrect !== undefined ? question.isCorrect : false),
           explanation: question.explanation || null,
           topic: question.topic || null,
           difficulty: question.difficulty || null

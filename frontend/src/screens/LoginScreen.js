@@ -33,9 +33,8 @@ export default function LoginScreen({ navigation }) {
         response = await authService.register({ name, email, password });
         Alert.alert('Sucesso', 'Conta criada com sucesso!');
       }
-      
-      // Navegar para a tela de exames
-      navigation.navigate('Exams', { 
+ 
+      navigation.replace('Home', { 
         name: response.user.name,
         userId: response.user.id 
       });

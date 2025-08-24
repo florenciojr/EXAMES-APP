@@ -4,7 +4,7 @@
     "slug": "exames-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "Dark",
     "assetBundlePatterns": [
       "**/*"
     ],
