@@ -1,25 +1,42 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// ✅ CORREÇÃO: Use apenas o IP/porta SEM /api no final
-const API_BASE_URL = 'http://192.168.1.4:5000'; // SEM /api no final
+const API_BASE_URL = 'http://10.111.198.168:5000';
 
 console.log('🔗 Configurando API com baseURL:', API_BASE_URL);
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 15000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
 // Interceptor para adicionar o token às requisições
 api.interceptors.request.use(
   async (config) => {
     try {
-      const token = await AsyncStorage.getItem('token');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-        console.log('✅ Token adicionado à requisição:', config.url);
+      const publicRoutes = [
+        '/auth/login',
+        '/auth/register',
+        '/api/health',
+        '/api/test/db',
+        '/api/test/exams'
+      ];
+      
+      const isPublicRoute = publicRoutes.some(route => 
+        config.url?.includes(route)
+      );
+      
+      if (!isPublicRoute) {
+        const token = await AsyncStorage.getItem('token');
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+          console.log('✅ Token adicionado à requisição:', config.url);
+        }
       }
+      
       return config;
     } catch (error) {
       console.error('❌ Erro ao adicionar token:', error);
@@ -31,24 +48,16 @@ api.interceptors.request.use(
   }
 );
 
-// Interceptor para tratar erros
+// Interceptor para tratar respostas
 api.interceptors.response.use(
   (response) => {
-    console.log('✅ Resposta da API:', response.status, response.config.url);
     return response;
   },
-  (error) => {
-    console.error('❌ Erro na API:', {
-      url: error.config?.url,
-      status: error.response?.status,
-      message: error.message,
-      data: error.response?.data
-    });
-    
+  async (error) => {
     if (error.response?.status === 401) {
-      // Token inválido ou expirado
-      AsyncStorage.removeItem('token');
-      AsyncStorage.removeItem('user');
+      console.log('🔐 Token inválido - limpando storage');
+      await AsyncStorage.removeItem('token');
+      await AsyncStorage.removeItem('user');
     }
     
     return Promise.reject(error);

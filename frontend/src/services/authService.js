@@ -5,58 +5,46 @@ export const authService = {
   // Login
   login: async (email, password) => {
     try {
-      console.log('Tentando login com:', email);
-      const response = await api.post('/auth/login', { 
+      console.log('🔐 Tentando login com:', email);
+      
+      // ✅ CORREÇÃO: Use a rota CORRETA baseada no seu servidor
+      const response = await api.post('/api/auth/login', { 
         email: email.trim(),
         password: password.trim()
       });
       
-      console.log('Resposta do login:', response.data);
+      console.log('✅ Resposta do login:', response.data);
       
       if (response.data.token) {
-        // Salvar user COM ID no AsyncStorage
         await AsyncStorage.setItem('token', response.data.token);
-        await AsyncStorage.setItem('user', JSON.stringify({
-          id: response.data.user.id,
-          name: response.data.user.name,
-          email: response.data.user.email
-        }));
-        console.log('Token e user salvos com sucesso');
+        await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
       }
       
       return response.data;
     } catch (error) {
-      console.error('Erro no login:', error.response?.data || error.message);
-      throw new Error(error.response?.data?.message || 'Erro no login. Verifique o servidor.');
+      console.error('❌ Erro no login:', error.response?.data || error.message);
+      throw new Error(error.response?.data?.message || 'Erro no login');
     }
   },
 
   // Registrar
   register: async (userData) => {
     try {
-      console.log('Tentando registrar:', userData);
-      const response = await api.post('/auth/register', {
+      const response = await api.post('/api/auth/register', {
         name: userData.name.trim(),
         email: userData.email.trim(),
         password: userData.password.trim()
       });
       
-      console.log('Resposta do registro:', response.data);
-      
       if (response.data.token) {
-        // Salvar user COM ID no AsyncStorage
         await AsyncStorage.setItem('token', response.data.token);
-        await AsyncStorage.setItem('user', JSON.stringify({
-          id: response.data.user.id,
-          name: response.data.user.name,
-          email: response.data.user.email
-        }));
+        await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
       }
       
       return response.data;
     } catch (error) {
-      console.error('Erro no registro:', error.response?.data || error.message);
-      throw new Error(error.response?.data?.message || 'Erro no registro. Verifique o servidor.');
+      console.error('❌ Erro no registro:', error.response?.data || error.message);
+      throw new Error(error.response?.data?.message || 'Erro no registro');
     }
   },
 
@@ -66,7 +54,7 @@ export const authService = {
       await AsyncStorage.removeItem('token');
       await AsyncStorage.removeItem('user');
     } catch (error) {
-      console.error('Erro ao fazer logout:', error);
+      console.error('❌ Erro ao fazer logout:', error);
     }
   },
 
@@ -76,7 +64,7 @@ export const authService = {
       const userJson = await AsyncStorage.getItem('user');
       return userJson ? JSON.parse(userJson) : null;
     } catch (error) {
-      console.error('Erro ao obter usuário:', error);
+      console.error('❌ Erro ao obter usuário:', error);
       return null;
     }
   },
@@ -86,7 +74,7 @@ export const authService = {
     try {
       return await AsyncStorage.getItem('token');
     } catch (error) {
-      console.error('Erro ao obter token:', error);
+      console.error('❌ Erro ao obter token:', error);
       return null;
     }
   },
@@ -97,7 +85,7 @@ export const authService = {
       const token = await AsyncStorage.getItem('token');
       return !!token;
     } catch (error) {
-      console.error('Erro ao verificar autenticação:', error);
+      console.error('❌ Erro ao verificar autenticação:', error);
       return false;
     }
   }
