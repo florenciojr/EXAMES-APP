@@ -1,88 +1,109 @@
 const express = require('express');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
-
 const router = express.Router();
 
-// Registrar usuário
-router.post('/register', [
-  body('name').notEmpty().withMessage('Nome é obrigatório'),
-  body('email').isEmail().withMessage('Email deve ser válido'),
-  body('password').isLength({ min: 6 }).withMessage('Senha deve ter pelo menos 6 caracteres')
-], async (req, res) => {
+// Registro de usuário
+router.post('/register', async (req, res) => {
   try {
-    // Verificar erros de validação
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+    const { name, email, password } = req.body;
+
+    // Validações básicas
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Nome, email e senha são obrigatórios'
+      });
     }
 
-    const { name, email, password } = req.body;
-    
     // Verificar se usuário já existe
-    const userExists = await User.findByEmail(email);
-    if (userExists) {
-      return res.status(400).json({ message: 'Usuário já existe' });
+    const existingUser = await User.findByEmail(email);
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message: 'Email já está em uso'
+      });
     }
-    
+
+    // Hash da senha
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
     // Criar usuário
-    const userId = await User.create({ name, email, password });
-    
-    // Gerar token
-    const token = jwt.sign({ id: userId }, process.env.JWT_SECRET || 'fallback_secret', {
-      expiresIn: '30d',
+    const userId = await User.create({
+      name,
+      email,
+      password: hashedPassword
     });
-    
-    // Buscar usuário criado
-    const user = await User.findById(userId);
-    
+
+    // Gerar token JWT
+    const token = jwt.sign(
+      { id: userId, email },
+      process.env.JWT_SECRET || 'secret_key_123',
+      { expiresIn: '24h' }
+    );
+
     res.status(201).json({
+      success: true,
+      message: 'Usuário criado com sucesso',
       token,
       user: {
-        id: user.id,
-        name: user.name,
-        email: user.email
+        id: userId,
+        name,
+        email
       }
     });
   } catch (error) {
     console.error('Erro no registro:', error);
-    res.status(500).json({ message: 'Erro interno do servidor' });
+    res.status(500).json({
+      success: false,
+      message: 'Erro interno do servidor'
+    });
   }
 });
 
-// Login
-router.post('/login', [
-  body('email').isEmail().withMessage('Email deve ser válido'),
-  body('password').notEmpty().withMessage('Senha é obrigatória')
-], async (req, res) => {
+// Login de usuário
+router.post('/login', async (req, res) => {
   try {
-    // Verificar erros de validação
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+    const { email, password } = req.body;
+
+    // Validações básicas
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email e senha são obrigatórios'
+      });
     }
 
-    const { email, password } = req.body;
-    
     // Verificar se usuário existe
     const user = await User.findByEmail(email);
     if (!user) {
-      return res.status(401).json({ message: 'Email ou senha incorretos' });
+      return res.status(401).json({
+        success: false,
+        message: 'Credenciais inválidas'
+      });
     }
-    
+
     // Verificar senha
-    const isPasswordCorrect = await User.checkPassword(password, user.password);
-    if (!isPasswordCorrect) {
-      return res.status(401).json({ message: 'Email ou senha incorretos' });
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Credenciais inválidas'
+      });
     }
-    
-    // Gerar token
-    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET || 'fallback_secret', {
-      expiresIn: '30d',
-    });
-    
+
+    // Gerar token JWT
+    const token = jwt.sign(
+      { id: user.id, email: user.email },
+      process.env.JWT_SECRET || 'secret_key_123',
+      { expiresIn: '24h' }
+    );
+
     res.json({
+      success: true,
+      message: 'Login realizado com sucesso',
       token,
       user: {
         id: user.id,
@@ -92,31 +113,10 @@ router.post('/login', [
     });
   } catch (error) {
     console.error('Erro no login:', error);
-    res.status(500).json({ message: 'Erro interno do servidor' });
-  }
-});
-
-// Obter perfil do usuário
-router.get('/profile', async (req, res) => {
-  try {
-    // Simulação - em produção usar middleware de autenticação
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    
-    if (!token) {
-      return res.status(401).json({ message: 'Token não fornecido' });
-    }
-    
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
-    const user = await User.findById(decoded.id);
-    
-    if (!user) {
-      return res.status(404).json({ message: 'Usuário não encontrado' });
-    }
-    
-    res.json(user);
-  } catch (error) {
-    console.error('Erro ao buscar perfil:', error);
-    res.status(500).json({ message: 'Erro interno do servidor' });
+    res.status(500).json({
+      success: false,
+      message: 'Erro interno do servidor'
+    });
   }
 });
 

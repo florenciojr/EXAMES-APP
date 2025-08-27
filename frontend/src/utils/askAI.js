@@ -1,7 +1,7 @@
 // Utilitário para integração com IA
 export async function askAI(questionText, options, history = []) {
   // ✅ Mude para a nova rota
-  const BACKEND_URL = "https://bde7c687fc71.ngrok-free.app/api/ai/ask";
+  const BACKEND_URL = "https://a373847f992e.ngrok-free.app/api/ai/ask";
 
   if (!questionText || !options || !options.length) {
     console.error("⚠️ questionText ou options inválidos");
