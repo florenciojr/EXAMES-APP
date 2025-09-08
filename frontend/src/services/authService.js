@@ -91,4 +91,7 @@ export const authService = {
   }
 };
 
+// Remove a linha 'export default api;'
+// export default api;
+
 export default authService;

@@ -1,42 +1,26 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = 'http://172.20.10.2:5000';
+// ✅ CORREÇÃO: A URL deve incluir o prefixo /api, pois o seu backend está configurado assim.
+//const API_BASE_URL = 'http://10.89.220.253:5000/api';
+const API_BASE_URL = 'http://localhost:5000/api';
 
 console.log('🔗 Configurando API com baseURL:', API_BASE_URL);
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  timeout: 10000,
 });
 
 // Interceptor para adicionar o token às requisições
 api.interceptors.request.use(
   async (config) => {
     try {
-      const publicRoutes = [
-        '/auth/login',
-        '/auth/register',
-        '/api/health',
-        '/api/test/db',
-        '/api/test/exams'
-      ];
-      
-      const isPublicRoute = publicRoutes.some(route => 
-        config.url?.includes(route)
-      );
-      
-      if (!isPublicRoute) {
-        const token = await AsyncStorage.getItem('token');
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
-          console.log('✅ Token adicionado à requisição:', config.url);
-        }
+      const token = await AsyncStorage.getItem('token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+        console.log('✅ Token adicionado à requisição:', config.url);
       }
-      
       return config;
     } catch (error) {
       console.error('❌ Erro ao adicionar token:', error);
@@ -48,18 +32,26 @@ api.interceptors.request.use(
   }
 );
 
-// Interceptor para tratar respostas
+// Interceptor para tratar erros
 api.interceptors.response.use(
   (response) => {
+    console.log('✅ Resposta da API:', response.status, response.config.url);
     return response;
   },
-  async (error) => {
+  (error) => {
+    console.error('❌ Erro na API:', {
+      url: error.config?.url,
+      status: error.response?.status,
+      message: error.message,
+      data: error.response?.data
+    });
+
     if (error.response?.status === 401) {
-      console.log('🔐 Token inválido - limpando storage');
-      await AsyncStorage.removeItem('token');
-      await AsyncStorage.removeItem('user');
+      // Token inválido ou expirado
+      AsyncStorage.removeItem('token');
+      AsyncStorage.removeItem('user');
     }
-    
+
     return Promise.reject(error);
   }
 );

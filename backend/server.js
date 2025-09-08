@@ -1,77 +1,69 @@
 // backend/server.js
-import express from "express";
-import fetch from "node-fetch";
-import cors from "cors";
+
+const express = require('express');
+const cors = require('cors');
+require('dotenv').config();
 
 const app = express();
+const PORT = process.env.PORT || 5000;
+
+// Importar a conexão com a base de dados
+const { connect } = require('./config/database');
+
+// Importar as rotas
+const authRoutes = require('./routes/auth');
+
+// Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
-const API_KEY = "AIzaSyA2m380MuY_J-8Reb-VvZ1B9IPX0xc6AbU"; // ⚠️ substitui pela tua chave real
-const ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
-
-app.post("/askAI", async (req, res) => {
-  const { question, options, history = [] } = req.body;
-
-  try {
-    // força o history a ficar no formato certo
-    const formattedHistory = history.map(msg => ({
-      role: msg.role || "user",
-      parts: (msg.parts || []).map(p => ({ text: p.text }))
-    }));
-
-    const payload = {
-      contents: [
-        ...formattedHistory,
-        {
-          role: "user",
-          parts: [
-            {
-              text: `Você é um explicador virtual que ajuda alunos de Moçambique a estudar para exames de admissão. 
-
-Seu papel não é só dar a resposta, mas sim:
-- Dar pistas e dicas.
-- Fazer perguntas guiadas ao aluno.
-- Explicar o raciocínio passo a passo.
-- No fim, incentivar o aluno a tentar novamente.
-
-Questão: ${question}
-Alternativas: ${options.join(", ")}`
-            }
-          ]
-        }
-      ]
-    };
-
-    const response = await fetch(ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": API_KEY
-      },
-      body: JSON.stringify(payload)
-    });
-
-    const data = await response.json();
-    console.log("Resposta da IA:", JSON.stringify(data, null, 2));
-
-    const resultText =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      data?.candidates?.[0]?.output ||
-      data?.error?.message ||
-      null;
-
-    if (!resultText) {
-      res.status(500).json({ error: "Resposta inesperada da IA", raw: data });
-    } else {
-      res.json({ answer: resultText });
-    }
-  } catch (err) {
-    console.error("Erro de conexão:", err);
-    res.status(500).json({ error: "Erro ao conectar à IA" });
-  }
+// Middleware de logging (opcional)
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+    next();
 });
 
-app.listen(3000, "0.0.0.0", () =>
-  console.log("✅ Backend rodando em http://0.0.0.0:3000")
-);
+// Definir as rotas da API
+app.use('/api/auth', authRoutes);
+
+// Rota de saúde (health check)
+app.get('/api/health', (req, res) => {
+    res.status(200).json({
+        success: true,
+        message: '✅ API funcionando!',
+        timestamp: new Date().toISOString()
+    });
+});
+
+// Rota não encontrada (deve ser a última rota a ser definida)
+app.use((req, res) => {
+    res.status(404).json({
+        success: false,
+        message: 'Rota não encontrada',
+        path: req.originalUrl,
+    });
+});
+
+// Middleware de erro genérico
+app.use((error, req, res, next) => {
+    console.error('❌ Erro não tratado:', error);
+    res.status(500).json({
+        success: false,
+        message: 'Erro interno do servidor',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Ocorreu um erro',
+    });
+});
+
+// Iniciar o servidor e a conexão com o banco de dados
+connect().then(() => {
+    console.log('✅ Conexão com o banco de dados estabelecida!');
+    app.listen(PORT, '0.0.0.0', () => {
+        console.log(`🚀 Servidor rodando na porta ${PORT}`);
+        console.log(`📍 Local: http://localhost:${PORT}`);
+        console.log(`📊 Health Check: http://localhost:${PORT}/api/health`);
+        console.log(`🔐 Login: http://localhost:${PORT}/api/auth/login`);
+    });
+}).catch(err => {
+    console.error('❌ Erro ao conectar ao banco de dados:', err);
+    process.exit(1);
+});
