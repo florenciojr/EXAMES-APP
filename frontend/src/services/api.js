@@ -1,8 +1,9 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// ✅ CORREÇÃO: Use apenas o IP/porta SEM /api no final
-const API_BASE_URL = 'http://192.168.1.4:5000'; // SEM /api no final
+// ✅ CORREÇÃO: A URL deve incluir o prefixo /api, pois o seu backend está configurado assim.
+//const API_BASE_URL = 'http://10.89.220.253:5000/api';
+const API_BASE_URL = 'http://localhost:5000/api';
 
 console.log('🔗 Configurando API com baseURL:', API_BASE_URL);
 
@@ -44,13 +45,13 @@ api.interceptors.response.use(
       message: error.message,
       data: error.response?.data
     });
-    
+
     if (error.response?.status === 401) {
       // Token inválido ou expirado
       AsyncStorage.removeItem('token');
       AsyncStorage.removeItem('user');
     }
-    
+
     return Promise.reject(error);
   }
 );

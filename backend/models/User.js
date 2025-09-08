@@ -1,52 +1,36 @@
+// backend/models/User.js
+
 const { query } = require('../config/database');
 const bcrypt = require('bcryptjs');
 
 class User {
-  // Criar usuário
-  static async create(userData) {
-    const { name, email, password } = userData;
-    const hashedPassword = await bcrypt.hash(password, 12);
-    
-    const result = await query(
-      'INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
-      [name, email, hashedPassword]
-    );
-    
-    return result.insertId;
-  }
+    static async findByEmail(email) {
+        try {
+            const sql = 'SELECT * FROM users WHERE email = ?';
+            const [rows] = await query(sql, [email]);
+            return rows[0];
+        } catch (error) {
+            console.error('Erro ao buscar usuário por email:', error);
+            throw error;
+        }
+    }
 
-  // Encontrar usuário por email
-  static async findByEmail(email) {
-    const users = await query(
-      'SELECT * FROM users WHERE email = ?',
-      [email]
-    );
-    return users[0];
-  }
-
-  // Encontrar usuário por ID
-  static async findById(id) {
-    const users = await query(
-      'SELECT id, name, email, created_at FROM users WHERE id = ?',
-      [id]
-    );
-    return users[0];
-  }
-
-  // Verificar senha
-  static async checkPassword(candidatePassword, hashedPassword) {
-    return await bcrypt.compare(candidatePassword, hashedPassword);
-  }
-
-  // Atualizar usuário
-  static async update(id, userData) {
-    const { name, email } = userData;
-    await query(
-      'UPDATE users SET name = ?, email = ? WHERE id = ?',
-      [name, email, id]
-    );
-    return true;
-  }
+    static async create({ name, email, password }) {
+        try {
+            const hashedPassword = await bcrypt.hash(password, 12);
+            const sql = 'INSERT INTO users (name, email, password) VALUES (?, ?, ?)';
+            const [result] = await query(sql, [name, email, hashedPassword]);
+            
+            return {
+                id: result.insertId,
+                name,
+                email
+            };
+        } catch (error) {
+            console.error('Erro ao criar usuário:', error);
+            throw error;
+        }
+    }
 }
 
 module.exports = User;
