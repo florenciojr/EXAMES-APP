@@ -1,13 +1,18 @@
+
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
-const path = require('path');
-const fs = require('fs');
 
 const app = express();
 
-// Middleware básico
+// ========================================
+// MIDDLEWARE BÁSICO
+// ========================================
+
+// CORS
 app.use(cors());
+
+// Parser de JSON
 app.use(express.json({ limit: '10mb' }));
 
 // Middleware de logging para debug
@@ -16,47 +21,45 @@ app.use((req, res, next) => {
   next();
 });
 
-// ✅ CARREGAR MIDDLEWARE DE AUTENTICAÇÃO
+// ========================================
+// MIDDLEWARE DE AUTENTICAÇÃO
+// ========================================
 const authMiddleware = require('./middleware/auth');
 app.use(authMiddleware);
 
-// ✅ ROTAS DE TESTE RÁPIDO PARA BD (públicas)
-app.get('/api/test/db', async (req, res) => {
-  try {
-    console.log('🧪 Testando conexão com BD...');
-    const { query } = require('./config/database');
-    
-    const result = await query('SELECT 1 + 1 as result');
-    console.log('✅ Resultado do teste BD:', result[0].result);
-    
-    res.json({
-      success: true,
-      message: 'Conexão com BD funcionando!',
-      testResult: result[0].result,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('❌ Erro na conexão com BD:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erro na conexão com BD',
-      error: error.message
-    });
-  }
-});
+// ========================================
+// ROTAS
+// ========================================
 
-// ✅ ROTAS DE AUTENTICAÇÃO (já estão públicas pelo middleware)
+// Rotas de autenticação (públicas)
 const authRoutes = require('./routes/auth');
 app.use('/api/auth', authRoutes);
 
-// ✅ ROTAS PROTEGIDAS (requerem autenticação)
+// Rotas de exames (protegidas)
 const examRoutes = require('./routes/exams');
 app.use('/api/exams', examRoutes);
 
+// Rotas de histórico (protegidas)
 const historyRoutes = require('./routes/history');
 app.use('/api/history', historyRoutes);
 
-// ✅ ROTA DE HEALTH CHECK (pública)
+// Rotas de IA (protegidas)
+const aiRoutes = require('./routes/aiRoutes');
+app.use('/api/ai', aiRoutes);
+
+// Rotas de debug/teste (públicas)
+const debugRoutes = require('./routes/debug');
+app.use('/api/test', debugRoutes);
+
+// Rotas de questões (protegidas)
+const questionRoutes = require('./routes/questions');
+app.use('/api/questions', questionRoutes);
+
+// ========================================
+// ROTAS ESPECIAIS
+// ========================================
+
+// Health check (público)
 app.get('/api/health', (req, res) => {
   res.json({ 
     success: true,
@@ -66,7 +69,7 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// ✅ ROTA RAIZ MELHORADA
+// Rota raiz (pública)
 app.get('/', (req, res) => {
   res.json({ 
     success: true,
@@ -79,15 +82,23 @@ app.get('/', (req, res) => {
       health: '/api/health',
       auth: {
         login: '/api/auth/login',
-        register: '/api/auth/register'
+        register: '/api/auth/register',
+        profile: '/api/auth/profile'
       },
       exams: '/api/exams',
-      history: '/api/history'
+      history: '/api/history',
+      ai: '/api/ai',
+      questions: '/api/questions',
+      debug: '/api/test'
     }
   });
 });
 
-// ✅ MIDDLEWARE DE ERRO MELHORADO
+// ========================================
+// MIDDLEWARE DE ERRO
+// ========================================
+
+// Middleware de erro global
 app.use((error, req, res, next) => {
   console.error('❌ Erro não tratado:', error);
   res.status(500).json({ 
@@ -98,7 +109,7 @@ app.use((error, req, res, next) => {
   });
 });
 
-// ✅ ROTA NÃO ENCONTRADA MELHORADA
+// Rota não encontrada
 app.use('*', (req, res) => {
   console.log('❌ Rota não encontrada:', req.originalUrl);
   res.status(404).json({ 
@@ -109,13 +120,21 @@ app.use('*', (req, res) => {
   });
 });
 
+// ========================================
+// INICIALIZAÇÃO DO SERVIDOR
+// ========================================
+
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
   console.log(`📍 Local: http://localhost:${PORT}`);
-  console.log(`🌐 Rede: http://0.0.0.0:${PORT}`);
-  console.log(`📊 Health Check: http://localhost:${PORT}/api/health`);
-  console.log(`🔐 Login: http://localhost:${PORT}/api/auth/login`);
-  console.log(`👤 Registro: http://localhost:${PORT}/api/auth/register`);
+  console.log(`🌐 Rede: http://172.20.10.2:${PORT}`);
+  console.log(`📱 Expo Go: http://172.20.10.2:${PORT}`);
+  console.log(`📊 Health Check: http://172.20.10.2:${PORT}/api/health`);
+  console.log(`🔐 Login: http://172.20.10.2:${PORT}/api/auth/login`);
+  console.log(`👤 Registro: http://172.20.10.2:${PORT}/api/auth/register`);
+  console.log(`🧪 Debug: http://172.20.10.2:${PORT}/api/test/db`);
 });
+
+module.exports = app;

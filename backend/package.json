@@ -2,10 +2,10 @@
   "name": "exames-app-backend",
   "version": "1.0.0",
   "description": "Backend para o app de exames com MySQL",
-  "main": "app.js",
+  "main": "App.js",
   "scripts": {
-    "start": "node app.js",
-    "dev": "nodemon app.js",
+    "start": "node App.js",
+    "dev": "nodemon App.js",
     "init-db": "node -e \"console.log('Execute o arquivo database.sql no phpMyAdmin'); console.log('Acesse: http://localhost/phpmyadmin');\""
   },
   "dependencies": {

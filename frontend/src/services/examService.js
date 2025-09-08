@@ -5,7 +5,7 @@ export const examService = {
   // Buscar todos os exames
   getExams: async () => {
     try {
-      const response = await api.get('/exams');
+      const response = await api.get('/api/exams');
       return response.data;
     } catch (error) {
       console.error('❌ Erro ao buscar exames:', error);
@@ -16,7 +16,7 @@ export const examService = {
   // Buscar exame específico
   getExam: async (examId) => {
     try {
-      const response = await api.get(`/exams/${examId}`);
+      const response = await api.get(`/api/exams/${examId}`);
       return response.data;
     } catch (error) {
       console.error('❌ Erro ao buscar exame:', error);
